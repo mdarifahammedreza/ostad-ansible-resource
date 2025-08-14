@@ -87,9 +87,8 @@
         restart_policy: always
         ports:
           - "127.0.0.1:{{ app_port }}:{{ container_internal_port }}"
+        docker_host: unix://var/run/docker.sock
       become: yes
-      environment:
-        DOCKER_HOST: "unix://var/run/docker.sock"
 
     - name: Drop NGINX site config
       template:
