@@ -5,7 +5,6 @@
 
   vars:
     container_image: "arif0ahammed0reza/next-japan:latest"
-    # External port NGINX will proxy to locally; container will bind to 127.0.0.1:{{ app_port }}
     app_port: 3000
     container_internal_port: 3000
 
@@ -18,30 +17,65 @@
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-    - name: Install required packages
+    - name: Remove conflicting packages
       apt:
         name:
           - docker.io
-          - nginx
+          - docker-doc
+          - docker-compose
+          - podman-docker
+          - containerd
+          - runc
+        state: absent
+
+    - name: Install required apt dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3
           - python3-pip
+          - nginx
         state: present
-      when: ansible_os_family == "Debian"
+        update_cache: yes
 
-    - name: Install docker Python SDK (for community.docker)
-      pip:
-        name: docker
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
 
-    - name: Ensure docker service enabled and started
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+        update_cache: yes
+
+    - name: Start and enable Docker service
       service:
         name: docker
         state: started
         enabled: yes
 
+    - name: Install docker Python SDK
+      pip:
+        name: docker
+        executable: pip3
+
     - name: Run/Update the application container
       community.docker.docker_container:
         name: next-japan
         image: "{{ container_image }}"
-        pull: always
+        pull: true
         restart_policy: always
         ports:
           - "127.0.0.1:{{ app_port }}:{{ container_internal_port }}"
@@ -50,7 +84,7 @@
       template:
         src: templates/nginx_next.conf.j2
         dest: /etc/nginx/sites-available/next-japan.conf
-        mode: '0644'
+        mode: "0644"
 
     - name: Enable NGINX site
       file:
