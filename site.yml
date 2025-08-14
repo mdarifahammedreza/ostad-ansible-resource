@@ -1,0 +1,75 @@
+---
+- name: Provision Dockerized Next.js with NGINX reverse proxy
+  hosts: web
+  become: yes
+
+  vars:
+    container_image: "arif0ahammed0reza/next-japan:latest"
+    # External port NGINX will proxy to locally; container will bind to 127.0.0.1:{{ app_port }}
+    app_port: 3000
+    container_internal_port: 3000
+
+  collections:
+    - community.docker
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages
+      apt:
+        name:
+          - docker.io
+          - nginx
+          - python3-pip
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install docker Python SDK (for community.docker)
+      pip:
+        name: docker
+
+    - name: Ensure docker service enabled and started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Run/Update the application container
+      community.docker.docker_container:
+        name: next-japan
+        image: "{{ container_image }}"
+        pull: always
+        restart_policy: always
+        ports:
+          - "127.0.0.1:{{ app_port }}:{{ container_internal_port }}"
+
+    - name: Drop NGINX site config
+      template:
+        src: templates/nginx_next.conf.j2
+        dest: /etc/nginx/sites-available/next-japan.conf
+        mode: '0644'
+
+    - name: Enable NGINX site
+      file:
+        src: /etc/nginx/sites-available/next-japan.conf
+        dest: /etc/nginx/sites-enabled/next-japan.conf
+        state: link
+        force: yes
+
+    - name: Remove default NGINX site (if present)
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Test NGINX configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Reload NGINX
+      service:
+        name: nginx
+        state: restarted
