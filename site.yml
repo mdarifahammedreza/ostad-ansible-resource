@@ -79,15 +79,6 @@
     - debug:
         var: docker_sdk_version.stdout
 
-    - name: Check docker connection with command
-      command: docker ps
-      become: yes
-      register: docker_ps_output
-      changed_when: false
-
-    - debug:
-        var: docker_ps_output
-
     - name: Run/Update the application container
       community.docker.docker_container:
         name: next-japan
@@ -96,7 +87,6 @@
         restart_policy: always
         ports:
           - "127.0.0.1:{{ app_port }}:{{ container_internal_port }}"
-        docker_host: unix://var/run/docker.sock
       become: yes
 
     - name: Drop NGINX site config
