@@ -1,15 +1,16 @@
 - name: Provision Dockerized Next.js with NGINX reverse proxy
   hosts: web
   become: yes
-
   vars:
     container_image: "arif0ahammed0reza/next-japan:latest"
     app_port: 3000
     container_internal_port: 3000
-    ansible_python_interpreter: /usr/bin/python3 # Ensures Python3 is used
-
   collections:
     - community.docker
+
+  # Ensure Ansible uses the correct Python on remote host
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
 
   tasks:
     - name: Update apt cache
@@ -67,13 +68,14 @@
         enabled: yes
 
     - name: Remove old docker-py
-      command: /usr/bin/python3 -m pip uninstall -y docker-py
+      command: python3 -m pip uninstall -y docker-py
+      ignore_errors: yes
 
     - name: Install latest docker SDK for Python
-      command: /usr/bin/python3 -m pip install --upgrade docker
+      command: python3 -m pip install --upgrade docker
 
     - name: Verify Docker SDK installation
-      command: /usr/bin/python3 -c "import docker; print(docker.__version__)"
+      command: python3 -c "import docker; print(docker.__version__)"
       register: docker_sdk_version
       changed_when: false
 
@@ -81,7 +83,6 @@
         var: docker_sdk_version.stdout
 
     - name: Run/Update the application container
-      become: yes
       community.docker.docker_container:
         name: next-japan
         image: "{{ container_image }}"
