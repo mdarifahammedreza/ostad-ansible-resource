@@ -79,14 +79,17 @@
     - debug:
         var: docker_sdk_version.stdout
 
+    - name: Pull latest image
+      command: "docker pull {{ container_image }}"
+      become: yes
+
+    - name: Stop and remove existing container
+      command: "docker rm -f next-japan"
+      become: yes
+      ignore_errors: yes
+
     - name: Run/Update the application container
-      community.docker.docker_container:
-        name: next-japan
-        image: "{{ container_image }}"
-        pull: true
-        restart_policy: always
-        ports:
-          - "127.0.0.1:{{ app_port }}:{{ container_internal_port }}"
+      command: "docker run -d --name next-japan --restart always -p 127.0.0.1:{{ app_port }}:{{ container_internal_port }} {{ container_image }}"
       become: yes
 
     - name: Drop NGINX site config
