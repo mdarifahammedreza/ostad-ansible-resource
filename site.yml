@@ -79,6 +79,15 @@
     - debug:
         var: docker_sdk_version.stdout
 
+    - name: Check docker connection with command
+      command: docker ps
+      become: yes
+      register: docker_ps_output
+      changed_when: false
+
+    - debug:
+        var: docker_ps_output
+
     - name: Run/Update the application container
       community.docker.docker_container:
         name: next-japan
