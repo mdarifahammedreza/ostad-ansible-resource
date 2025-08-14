@@ -1,0 +1,121 @@
+- name: Provision Dockerized Next.js with NGINX reverse proxy
+  hosts: web
+  become: yes
+  vars:
+    container_image: "arif0ahammed0reza/next-japan:latest"
+    app_port: 3000
+    container_internal_port: 3000
+    ansible_python_interpreter: /usr/bin/python3
+  collections:
+    - community.docker
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Remove conflicting packages
+      apt:
+        name:
+          - docker.io
+          - docker-doc
+          - docker-compose
+          - podman-docker
+          - containerd
+          - runc
+        state: absent
+
+    - name: Install required apt dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3
+          - python3-pip
+          - nginx
+        state: present
+        update_cache: yes
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+        update_cache: yes
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Remove old docker-py
+      command: python3 -m pip uninstall -y docker-py
+      ignore_errors: yes
+
+    - name: Install latest docker SDK for Python
+      command: python3 -m pip install --upgrade docker
+
+    - name: Verify Docker SDK installation
+      command: python3 -c "import docker; print(docker.__version__)"
+      register: docker_sdk_version
+      changed_when: false
+
+    - debug:
+        var: docker_sdk_version.stdout
+
+    - name: Pull latest image
+      command: "docker pull {{ container_image }}"
+      become: yes
+
+    - name: Stop and remove existing container
+      command: "docker rm -f next-japan"
+      become: yes
+      ignore_errors: yes
+
+    - name: Run/Update the application container
+      command: "docker run -d --name next-japan --restart always -p 127.0.0.1:{{ app_port }}:{{ container_internal_port }} {{ container_image }}"
+      become: yes
+
+    - name: Drop NGINX site config
+      template:
+        src: templates/nginx_next.conf.j2
+        dest: /etc/nginx/sites-available/next-japan.conf
+        mode: "0644"
+
+    - name: Enable NGINX site
+      file:
+        src: /etc/nginx/sites-available/next-japan.conf
+        dest: /etc/nginx/sites-enabled/next-japan.conf
+        state: link
+        force: yes
+
+    - name: Remove default NGINX site (if present)
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Test NGINX configuration
+      command: nginx -t
+      register: nginx_test
+      changed_when: false
+
+    - name: Reload NGINX
+      service:
+        name: nginx
+        state: restarted
