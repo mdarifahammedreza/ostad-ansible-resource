@@ -6,7 +6,7 @@
     container_image: "arif0ahammed0reza/next-japan:latest"
     app_port: 3000
     container_internal_port: 3000
-    ansible_python_interpreter: /usr/local/bin/python3
+    ansible_python_interpreter: /usr/bin/python3
   collections:
     - community.docker
 
