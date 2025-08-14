@@ -77,6 +77,14 @@
         executable: pip3
         state: latest
 
+    - name: Verify Docker SDK installation
+      command: python3 -c "import docker; print(docker.__version__)"
+      register: docker_sdk_version
+      changed_when: false
+
+    - debug:
+        var: docker_sdk_version.stdout
+
     - name: Run/Update the application container
       become: yes
       community.docker.docker_container:
@@ -86,6 +94,9 @@
         restart_policy: always
         ports:
           - "127.0.0.1:{{ app_port }}:{{ container_internal_port }}"
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+        docker_host: unix:///var/run/docker.sock
 
     - name: Drop NGINX site config
       template:
